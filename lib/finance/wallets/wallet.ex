@@ -35,11 +35,11 @@ defmodule Finance.Wallets.Wallet do
 
   def deposit(wallet, amount) do
     wallet
-    |> Ecto.Changeset.change(balance: wallet.balance + amount)
+    |> Ecto.Changeset.change(balance: Decimal.add(wallet.balance, amount))
   end
 
   def withdraw(wallet, amount) do
     wallet
-    |> Ecto.Changeset.change(balance: wallet.balance - amount)
+    |> Ecto.Changeset.change(balance: Decimal.sub(wallet.balance, amount))
   end
 end

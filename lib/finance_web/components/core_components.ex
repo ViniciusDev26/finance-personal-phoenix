@@ -66,7 +66,7 @@ defmodule FinanceWeb.CoreComponents do
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
+              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition bg-zinc-100"
             >
               <div class="absolute top-6 right-5">
                 <button
@@ -515,6 +515,20 @@ defmodule FinanceWeb.CoreComponents do
           </tr>
         </tbody>
       </table>
+    </div>
+    """
+  end
+
+  def card(assigns) do
+    ~H"""
+    <div class="w-full max-w-sm p-4 bg-white border border-gray-200 rounded-lg shadow sm:p-8">
+      <div class="h-full flex flex-col items-center justify-center">
+        <h5 class="mb-4 text-xl font-medium text-gray-500"><%= @label %></h5>
+        <div class="flex items-baseline text-gray-900">
+          <span class="text-3xl"><%= @currency %></span>
+          <span class="text-5xl font-semibold tracking-tight"><%= @amount %></span>
+        </div>
+      </div>
     </div>
     """
   end
