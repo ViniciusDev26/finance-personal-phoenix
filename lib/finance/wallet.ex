@@ -48,6 +48,10 @@ defmodule Finance.Wallets do
     Wallet.withdraw(wallet, operation_params["amount"]) |> Repo.update()
   end
 
+  def update(operation) do
+    Repo.update(operation)
+  end
+
   def delete_operation(operation_id) do
     operation = Repo.get(WalletOperation, operation_id)
     wallet = Repo.get(Wallet, operation.wallet_id)

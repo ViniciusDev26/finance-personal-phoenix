@@ -52,6 +52,7 @@ defmodule FinanceWeb.Router do
       live "/users/settings/confirm_email/:token", UserSettingsLive, :confirm_email
       live "/", WalletHomeLive, :new
       post "/wallet", WalletController, :create
+      put "/wallet", WalletController, :update
     end
   end
 
