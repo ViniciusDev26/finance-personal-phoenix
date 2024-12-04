@@ -41,7 +41,7 @@ alias Finance.Wallets
         </thead>
         <tbody>
           <%= for operation <- @wallet_operations do %>
-            <tr class={"bg-white border-b rounded p-8 #{if operation.operation_type == "DEPOSIT", do: "bg-emerald-100", else: "bg-red-100"  }"}>
+            <tr class={"bg-white border-b rounded p-8 #{if operation.operation_type == "DEPOSIT", do: "bg-emerald-200", else: "bg-red-200"  }"}>
               <td><%= operation.name %></td>
               <td><%= operation.details %></td>
               <td><%= operation.amount %></td>
