@@ -55,44 +55,78 @@ defmodule Finance.Wallets do
   end
 
   @doc """
-  Atualiza uma movimentação e corrige o saldo: desfaz o efeito antigo e aplica o novo.
+  Busca uma movimentação garantindo que ela pertence à carteira do usuário.
+  Retorna `nil` se não existir, for de outro usuário ou o id for inválido.
   """
-  def update_operation(%WalletOperation{} = operation, attrs) do
-    Repo.transaction(fn ->
-      wallet = Repo.get!(Wallet, operation.wallet_id)
+  def get_user_operation(user_id, operation_id) do
+    case Ecto.Type.cast(:id, operation_id) do
+      {:ok, id} when is_integer(id) ->
+        Repo.one(
+          from w_o in WalletOperation,
+            join: w in Wallet,
+            on: w_o.wallet_id == w.id,
+            where: w_o.id == ^id and w.user_id == ^user_id
+        )
 
-      with {:ok, updated} <-
-             operation
-             |> WalletOperation.registration_changeset(attrs)
-             |> Repo.update(),
-           new_balance =
-             wallet.balance
-             |> balance_effect(operation, :revert)
-             |> balance_effect(updated, :apply),
-           {:ok, _wallet} <- wallet |> Wallet.set_balance(new_balance) |> Repo.update() do
-        updated
-      else
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
+      _ ->
+        nil
+    end
   end
 
-  def delete_operation(operation_id) do
-    operation = Repo.get!(WalletOperation, operation_id)
+  @doc """
+  Atualiza uma movimentação do usuário e corrige o saldo: desfaz o efeito
+  antigo e aplica o novo. Retorna `{:error, :not_found}` se a movimentação
+  não pertencer ao usuário.
+  """
+  def update_operation(user_id, operation_id, attrs) do
+    with %WalletOperation{} = operation <- get_user_operation(user_id, operation_id) do
+      # A carteira de uma movimentação nunca muda pela edição.
+      attrs = Map.drop(attrs, ["wallet_id", :wallet_id])
 
-    Repo.transaction(fn ->
-      wallet = Repo.get!(Wallet, operation.wallet_id)
+      Repo.transaction(fn ->
+        wallet = Repo.get!(Wallet, operation.wallet_id)
 
-      with {:ok, deleted} <- Repo.delete(operation),
-           {:ok, _wallet} <-
-             wallet
-             |> Wallet.set_balance(balance_effect(wallet.balance, operation, :revert))
-             |> Repo.update() do
-        deleted
-      else
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
+        with {:ok, updated} <-
+               operation
+               |> WalletOperation.registration_changeset(attrs)
+               |> Repo.update(),
+             new_balance =
+               wallet.balance
+               |> balance_effect(operation, :revert)
+               |> balance_effect(updated, :apply),
+             {:ok, _wallet} <- wallet |> Wallet.set_balance(new_balance) |> Repo.update() do
+          updated
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    else
+      nil -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Remove uma movimentação do usuário e desfaz o efeito no saldo.
+  Retorna `{:error, :not_found}` se a movimentação não pertencer ao usuário.
+  """
+  def delete_operation(user_id, operation_id) do
+    with %WalletOperation{} = operation <- get_user_operation(user_id, operation_id) do
+      Repo.transaction(fn ->
+        wallet = Repo.get!(Wallet, operation.wallet_id)
+
+        with {:ok, deleted} <- Repo.delete(operation),
+             {:ok, _wallet} <-
+               wallet
+               |> Wallet.set_balance(balance_effect(wallet.balance, operation, :revert))
+               |> Repo.update() do
+          deleted
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    else
+      nil -> {:error, :not_found}
+    end
   end
 
   defp balance_effect(balance, %WalletOperation{operation_type: type, amount: amount}, mode) do

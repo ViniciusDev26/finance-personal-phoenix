@@ -1,6 +1,5 @@
 defmodule FinanceWeb.WalletHomeLive do
 alias Finance.Wallets.WalletOperation
-alias Finance.Repo
 alias Finance.Wallets
   use FinanceWeb, :live_view
 
@@ -74,9 +73,11 @@ alias Finance.Wallets
     {:ok, assign(socket, form: form), temporary_assigns: [form: form, show: false, editing: false, wallet_operations: wallet_operations, wallet_operations_DEPOSIT: wallet_operations_DEPOSIT, wallet_operations_WITHDRAWN: wallet_operations_WITHDRAWN]}
   end
 
-  def handle_event("delete", params, socket) do
-    Wallets.delete_operation(params["id"])
-    {:noreply, assign(socket, %{})}
+  def handle_event("delete", %{"id" => id}, socket) do
+    case Wallets.delete_operation(socket.assigns.current_user.id, id) do
+      {:ok, _} -> {:noreply, socket}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Movimentação não encontrada.")}
+    end
   end
 
   def handle_event("show_modal", _, socket) do
@@ -89,11 +90,18 @@ alias Finance.Wallets
   end
 
   def handle_event("edit", %{"id" => id}, socket) do
-    operation = Repo.get(WalletOperation, id)
-    wallet_op = WalletOperation.registration_changeset(operation, %{})
-    form = to_form(wallet_op, as: "wallet_operation")
+    case Wallets.get_user_operation(socket.assigns.current_user.id, id) do
+      %WalletOperation{} = operation ->
+        form =
+          operation
+          |> WalletOperation.registration_changeset(%{})
+          |> to_form(as: "wallet_operation")
 
-    {:noreply, assign(socket, form: form, editing: true, show: true)}
+        {:noreply, assign(socket, form: form, editing: true, show: true)}
+
+      nil ->
+        {:noreply, put_flash(socket, :error, "Movimentação não encontrada.")}
+    end
   end
 
   def handle_event("filter", params, socket) do
