@@ -5,24 +5,37 @@ defmodule FinanceWeb.WalletController do
   alias Finance.Wallets
   alias Finance.Repo
 
-
-  def create(conn, params) do
+  def create(conn, %{"wallet_operation" => operation_params}) do
     user_id = get_session(conn, :user_id)
-    type = params["wallet_operation"]["operation_type"]
 
-    params = Map.put(params["wallet_operation"], "user_id", user_id)
-    |> Map.put("amount", String.to_integer(params["wallet_operation"]["amount"]))
-    Wallets.make_operation(String.to_atom(type), params)
+    params =
+      operation_params
+      |> normalize_amount()
+      |> Map.put("user_id", user_id)
 
-    redirect(conn, to: "/")
+    conn
+    |> put_result_flash(Wallets.make_operation(params), "Movimentação registrada.")
+    |> redirect(to: "/")
   end
 
-  def update(conn, params) do
-    operation = Repo.get(WalletOperation, params["wallet_operation"]["id"])
-    changeset = WalletOperation.registration_changeset(operation, params["wallet_operation"])
+  def update(conn, %{"wallet_operation" => operation_params}) do
+    operation = Repo.get!(WalletOperation, operation_params["id"])
+    result = Wallets.update_operation(operation, normalize_amount(operation_params))
 
-    Wallets.update(changeset)
-
-    redirect(conn, to: "/")
+    conn
+    |> put_result_flash(result, "Movimentação atualizada.")
+    |> redirect(to: "/")
   end
+
+  # Aceita "10,50" além de "10.50"; o Ecto converte a string para Decimal.
+  defp normalize_amount(%{"amount" => amount} = params) when is_binary(amount) do
+    Map.put(params, "amount", amount |> String.trim() |> String.replace(",", "."))
+  end
+
+  defp normalize_amount(params), do: params
+
+  defp put_result_flash(conn, {:ok, _}, message), do: put_flash(conn, :info, message)
+
+  defp put_result_flash(conn, {:error, _}, _message),
+    do: put_flash(conn, :error, "Não foi possível salvar a movimentação. Verifique os dados.")
 end

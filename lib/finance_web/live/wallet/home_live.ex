@@ -23,7 +23,7 @@ alias Finance.Wallets
             <% end %>
             <.input label="Nome da operação" field={@form[:name]} type="text"/>
             <.input label="Descrição" field={@form[:details]} type="text" />
-            <.input label="Valor" field={@form[:amount]} type="number"/>
+            <.input label="Valor" field={@form[:amount]} type="number" step="0.01" min="0"/>
             <.input label="Tipo" type="select" field={@form[:operation_type]} options={[:DEPOSIT, :WITHDRAWAL]}/>
             <.button phx-click={hide_modal("operation-modal")}>Salvar</.button>
           </.simple_form>

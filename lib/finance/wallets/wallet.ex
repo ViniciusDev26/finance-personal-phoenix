@@ -33,13 +33,7 @@ defmodule Finance.Wallets.Wallet do
     |> validate_required([:user_id])
   end
 
-  def deposit(wallet, amount) do
-    wallet
-    |> Ecto.Changeset.change(balance: Decimal.add(wallet.balance, amount))
-  end
-
-  def withdraw(wallet, amount) do
-    wallet
-    |> Ecto.Changeset.change(balance: Decimal.sub(wallet.balance, amount))
+  def set_balance(wallet, balance) do
+    Ecto.Changeset.change(wallet, balance: balance)
   end
 end

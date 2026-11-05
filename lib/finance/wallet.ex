@@ -24,42 +24,83 @@ defmodule Finance.Wallets do
   end
 
   def create_wallet(user_id) do
-    %Wallet{user_id: user_id}
-    |> Wallet.registration_changeset(%{balance: 0, currency: "BRL"})
-    |> Repo.insert()
+    {:ok, wallet} =
+      %Wallet{user_id: user_id}
+      |> Wallet.registration_changeset(%{balance: 0, currency: "BRL"})
+      |> Repo.insert()
+
+    wallet
   end
 
-  def make_operation(:DEPOSIT, operation_params) do
+  @doc """
+  Registra uma movimentação e aplica o valor no saldo da carteira do usuário.
+  """
+  def make_operation(operation_params) do
     wallet = get_wallet(operation_params["user_id"])
-    %WalletOperation{wallet_id: wallet.id}
-    |> WalletOperation.registration_changeset(operation_params)
-    |> Repo.insert()
 
-    Wallet.deposit(wallet, operation_params["amount"]) |> Repo.update()
+    Repo.transaction(fn ->
+      with {:ok, operation} <-
+             %WalletOperation{wallet_id: wallet.id}
+             |> WalletOperation.registration_changeset(operation_params)
+             |> Repo.insert(),
+           {:ok, _wallet} <-
+             wallet
+             |> Wallet.set_balance(balance_effect(wallet.balance, operation, :apply))
+             |> Repo.update() do
+        operation
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
   end
 
-  def make_operation(:WITHDRAWAL, operation_params) do
-    wallet = get_wallet(operation_params["user_id"])
-    %WalletOperation{wallet_id: wallet.id}
-    |> WalletOperation.registration_changeset(operation_params)
-    |> Repo.insert()
-    |> IO.inspect()
+  @doc """
+  Atualiza uma movimentação e corrige o saldo: desfaz o efeito antigo e aplica o novo.
+  """
+  def update_operation(%WalletOperation{} = operation, attrs) do
+    Repo.transaction(fn ->
+      wallet = Repo.get!(Wallet, operation.wallet_id)
 
-    Wallet.withdraw(wallet, operation_params["amount"]) |> Repo.update()
-  end
-
-  def update(operation) do
-    Repo.update(operation)
+      with {:ok, updated} <-
+             operation
+             |> WalletOperation.registration_changeset(attrs)
+             |> Repo.update(),
+           new_balance =
+             wallet.balance
+             |> balance_effect(operation, :revert)
+             |> balance_effect(updated, :apply),
+           {:ok, _wallet} <- wallet |> Wallet.set_balance(new_balance) |> Repo.update() do
+        updated
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
   end
 
   def delete_operation(operation_id) do
-    operation = Repo.get(WalletOperation, operation_id)
-    wallet = Repo.get(Wallet, operation.wallet_id)
-    Repo.delete(operation)
-    if operation.operation_type == "DEPOSIT" do
-      Wallet.withdraw(wallet, operation.amount) |> Repo.update()
-    else
-      Wallet.deposit(wallet, operation.amount) |> Repo.update()
+    operation = Repo.get!(WalletOperation, operation_id)
+
+    Repo.transaction(fn ->
+      wallet = Repo.get!(Wallet, operation.wallet_id)
+
+      with {:ok, deleted} <- Repo.delete(operation),
+           {:ok, _wallet} <-
+             wallet
+             |> Wallet.set_balance(balance_effect(wallet.balance, operation, :revert))
+             |> Repo.update() do
+        deleted
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp balance_effect(balance, %WalletOperation{operation_type: type, amount: amount}, mode) do
+    case {type, mode} do
+      {"DEPOSIT", :apply} -> Decimal.add(balance, amount)
+      {"DEPOSIT", :revert} -> Decimal.sub(balance, amount)
+      {"WITHDRAWAL", :apply} -> Decimal.sub(balance, amount)
+      {"WITHDRAWAL", :revert} -> Decimal.add(balance, amount)
     end
   end
 end
