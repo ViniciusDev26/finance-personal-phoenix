@@ -61,9 +61,10 @@ alias Finance.Wallets
     """
   end
 
-  def mount(_params, session, socket) do
-    _ = Wallets.get_wallet(session["user_id"])
-    wallet_operations = Wallets.get_wallet_history(session["user_id"])
+  def mount(_params, _session, socket) do
+    user_id = socket.assigns.current_user.id
+    _ = Wallets.get_wallet(user_id)
+    wallet_operations = Wallets.get_wallet_history(user_id)
     wallet_operations_DEPOSIT = Enum.filter(wallet_operations, fn operation -> operation.operation_type == "DEPOSIT" end)
       |> Enum.reduce(Decimal.new(0), fn operation, acc -> Decimal.add(acc, operation.amount) end)
     wallet_operations_WITHDRAWN = Enum.filter(wallet_operations, fn operation -> operation.operation_type == "WITHDRAWAL" end)

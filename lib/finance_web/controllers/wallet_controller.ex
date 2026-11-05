@@ -6,7 +6,7 @@ defmodule FinanceWeb.WalletController do
   alias Finance.Repo
 
   def create(conn, %{"wallet_operation" => operation_params}) do
-    user_id = get_session(conn, :user_id)
+    user_id = conn.assigns.current_user.id
 
     params =
       operation_params

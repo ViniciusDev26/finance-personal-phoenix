@@ -36,7 +36,7 @@ defmodule FinanceWeb.UserConfirmationLive do
         {:noreply,
          socket
          |> put_flash(:info, "User confirmed successfully.")
-         |> redirect(to: ~p"/")}
+         |> redirect(to: after_confirmation_path(socket))}
 
       :error ->
         # If there is a current user and the account was already confirmed,
@@ -51,8 +51,13 @@ defmodule FinanceWeb.UserConfirmationLive do
             {:noreply,
              socket
              |> put_flash(:error, "User confirmation link is invalid or it has expired.")
-             |> redirect(to: ~p"/")}
+             |> redirect(to: after_confirmation_path(socket))}
         end
     end
   end
+
+  # "/" exige login; quem não está logado vai direto para a tela de login
+  # para que a mensagem de flash não seja sobrescrita pelo redirect de auth.
+  defp after_confirmation_path(%{assigns: %{current_user: %{}}}), do: ~p"/"
+  defp after_confirmation_path(_socket), do: ~p"/users/log_in"
 end
